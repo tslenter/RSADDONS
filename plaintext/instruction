@@ -1,7 +1,7 @@
 #!/bin/bash
 #Var
 LOGSTASH_VAR=/etc/logstash/conf.d
-RSDESTP_FTP=/opt/RS/plugins/ftp
+RSDESTP_FTP=/opt/RSADDONS/ftp
 
 #Check if user is root
 if ! [ $(id -u) = 0 ]; then
