@@ -1,6 +1,6 @@
 #!/bin/bash
 #Var
-RSDESTP_TP=/opt/RS/plugins/rollover
+RSDESTP_TP=/opt/RSADDONS/rollover
 
 #Check if user is root
 if ! [ $(id -u) = 0 ]; then
