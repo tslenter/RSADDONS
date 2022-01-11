@@ -1,6 +1,6 @@
 #!/bin/bash
 #Var
-RSDESTP_CP=/opt/RS/plugins/checkpoint
+RSDESTP_CP=/opt/RSADDONS/checkpoint
 
 #Check if user is root
 if ! [ $(id -u) = 0 ]; then
