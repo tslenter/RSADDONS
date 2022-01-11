@@ -1,6 +1,6 @@
 #!/bin/bash
 #Var
-RSDESTP_F5=/opt/RS/plugins/f5
+RSDESTP_F5=/opt/RSADDONS/f5
 
 #Check if user is root
 if ! [ $(id -u) = 0 ]; then
