@@ -1,6 +1,6 @@
 #!/bin/bash
 #Var
-RSDESTP_CIS=/opt/RS/plugins/cisco
+RSDESTP_CIS=/opt/RSADDONS/cisco
 
 #Check if user is root
 if ! [ $(id -u) = 0 ]; then
