@@ -20,7 +20,7 @@
 #Name author: Tom Slenter
 #E-mail: info@remotesyslog.com
 
-RSDESTP=/opt/RS/plugins
+RSDESTP=/opt/RS/addons
 SYSLOGCONF=/etc/syslog-ng/conf.d
 GEOCONF=/etc/GeoIP.conf
 APACHCONF=/var/www/html
