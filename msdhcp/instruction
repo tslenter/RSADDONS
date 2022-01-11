@@ -1,7 +1,7 @@
 #!/bin/bash
 #Var
 LOGSTASH_VAR=/etc/logstash/conf.d
-RSDESTP_DHCP=/opt/RS/plugins/msdhcp
+RSDESTP_DHCP=/opt/RSADDONS/msdhcp
 
 #Check if user is root
 if ! [ $(id -u) = 0 ]; then
