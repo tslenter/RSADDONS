@@ -1,0 +1,167 @@
+#!/bin/bash
+
+#License:
+#"Remote Syslog" is a free application what can be used to view syslog messages.
+#Copyright (C) 2020 Tom Slenter
+#
+#This program is free software: you can redistribute it and/or modify
+#it under the terms of the GNU General Public License as published by
+#the Free Software Foundation, either version 3 of the License.
+#
+#This program is distributed in the hope that it will be useful,
+#but WITHOUT ANY WARRANTY; without even the implied warranty of
+#MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+#GNU General Public License for more details.
+#
+#You should have received a copy of the GNU General Public License
+#along with this program. If not, see <http://www.gnu.org/licenses/>.
+#
+#For more information contact the author:
+#Name author: Tom Slenter
+#E-mail: info@remotesyslog.com
+
+FCONF=/etc/filebeat/filebeat.yml
+FCONFMOD=/etc/filebeat/modules.d/cisco.yml
+
+#Banner
+function banner() {
+    echo ""
+    echo "#################################################"
+    echo "#Remote Syslog X/C                              #"
+    echo "#More information: remotesyslog.com             #"
+    echo "#Remote Syslog plugins                          #"
+    echo "#Version: RSX 0.1                               #"
+    echo "#Donate: https://github.com/tslenter/RSX-RSC/   #"
+    echo "#################################################"
+    echo ""
+    echo "Install cisco module with filebeat ..."
+    echo "Make sure that kibana and elasticsearch are installed ..."
+    echo ""
+}
+
+#Check if user is root
+function checkroot() {
+    if ! [ $(id -u) = 0 ]; then
+        clear
+        banner
+        echo "This installation must be run as root!"
+        echo ""
+        exit 1
+    fi
+}
+
+#Check if file exist
+function check_file() {
+    file=$1
+    if [ -e "$file" ]; then
+        echo "File: $1 exists, continue installation ..."
+    else
+        echo "File: $1 does not exist, exit ..."
+        exit
+    fi
+}
+
+function installfilebeat() {
+    apt update
+    apt install filebeat
+    check_file $FCONF
+    filebeat modules enable cisco
+    check_file $FCONFMOD
+}
+
+function writeconfig() {
+    echo "Do you wish to enable the Cisco module? ..."
+    echo "We do activate ASA, IOS, FTD, edit /etc/filebeat/modules.d/cisco.yml to disable some services ..." 
+    while true; do
+    read -p "Do you wish to continue? y/n: " yn
+    case $yn in
+        [Yy]* ) break;;
+        [Nn]* ) exit;;
+        * ) echo "Please answer yes or no.";;
+    esac
+    done
+    echo "Writing new config ..."
+    sed -i 's|\#host: "localhost:5601"|host: "localhost:5601\/kibana"|' $FCONF
+    sed -i "s|\#var.syslog_host: localhost|var.syslog_host: 0\\.0\\.0\\.0|" $FCONFMOD
+    sed -i "s|\#var.input: syslog|var.input: syslog|" $FCONFMOD
+    sed -i "s|\enabled: false|enabled: true|" $FCONFMOD
+    sed -i "s|\#var.syslog_port: 9001|var.syslog_port: 561|" $FCONFMOD
+    sed -i "s|\#var.syslog_port: 9002|var.syslog_port: 560|" $FCONFMOD
+    sed -i "s|\#var.syslog_port: 9003|var.syslog_port: 562|" $FCONFMOD
+}
+
+function testconfig() {
+    filebeat test config
+}
+
+function infoload() {
+    echo "Default port 561/udp is used to recieve ASA ..."
+    echo "Default port 562/udp is used to recieve FTD ..."
+    echo "Default port 560/udp is used to recieve IOS ..."
+    echo "Cisco example logging command for IOS: logging host 172.16.2.249 transport udp port 560"
+    systemctl enable filebeat
+    service filebeat restart
+}
+
+function fwconf() {
+    filebeat setup -e
+    echo "Do you wish to enable the firewall for this? ..."
+    echo "Only use this if you setup the firewall for the core / RSX / RSC system ..." 
+    while true; do
+    read -p "Do you wish to continue? y/n: " yn
+    case $yn in
+        [Yy]* ) break;;
+        [Nn]* ) infoload; echo "Install done ..."; exit;;
+        * ) echo "Please answer yes or no.";;
+    esac
+    done
+    ufw allow 560/udp
+    ufw allow 561/udp
+    ufw allow 562/udp
+}
+
+function disablenetcisco() {
+    echo "Going to disable cisco module ..."
+    filebeat modules disable cisco
+    echo "Do you wish to disable filebeat service? ..."
+    while true; do
+    read -p "Do you wish to continue? y/n: " yn
+    case $yn in
+        [Yy]* ) break;;
+        [Nn]* ) exit;;
+        * ) echo "Please answer yes or no.";;
+    esac
+    done
+    service filebeat stop
+    systemctl disable filebeat
+}
+
+clear
+banner
+
+#Menu
+PS3='Please enter your choice: '
+options=("Install filebeat Cisco" "Remove filebeat Cisco" "Quit")
+select opt in "${options[@]}"
+do
+    case $opt in
+        "Install filebeat Cisco")
+            checkroot
+            installfilebeat
+            writeconfig
+            testconfig
+            fwconf
+            infoload
+            exit
+    ;;
+        "Remove filebeat Cisco")
+            checkroot
+            disablenetcisco
+            exit
+    ;;
+        "Quit")
+            break
+    ;;
+        *) echo "Invalid option $REPLY ..." ;;
+    esac
+done

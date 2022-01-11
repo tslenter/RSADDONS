@@ -1,0 +1,27 @@
+#!/bin/bash
+#Var
+RSDESTP_CP=/opt/RS/plugins/checkpoint
+
+#Check if user is root
+if ! [ $(id -u) = 0 ]; then
+    echo "This installation must be run as root!"
+    echo ""
+    exit 1
+fi
+
+echo "Add and configure the following configuration to syslog-ng:"
+cat $RSDESTP_CP/99X-Checkpoint.conf
+echo ""
+echo "To add Goe2 to checkpoint is the follwing elastic mapping:"
+cat $RSDESTP_CP/template_example
+echo ""
+echo "copy $RSDESTP_CP/checkpointplugin.conf to /etc/syslog-ng/scl/checkpoint/plugin.conf"
+echo ""
+echo "Configuration for the CheckPoint appliance:"
+echo "cp_log_export add name RSX target-server <enter_server_ip_here> target-port 5000 protocol udp format syslog read-mode semi-unified"
+echo "cp_log_export restart name RSX"
+echo ""
+echo "Remove configuration for the CheckPoint appliance:"
+echo "cp_log_export delete name RSX --apply-now"
+echo ""
+exit

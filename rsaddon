@@ -1,0 +1,422 @@
+#!/bin/bash
+
+#License:
+#"Remote Syslog" is a free application what can be used to view syslog messages.
+#Copyright (C) 2020 Tom Slenter
+#
+#This program is free software: you can redistribute it and/or modify
+#it under the terms of the GNU General Public License as published by
+#the Free Software Foundation, either version 3 of the License.
+#
+#This program is distributed in the hope that it will be useful,
+#but WITHOUT ANY WARRANTY; without even the implied warranty of
+#MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+#GNU General Public License for more details.
+#
+#You should have received a copy of the GNU General Public License
+#along with this program. If not, see <http://www.gnu.org/licenses/>.
+#
+#For more information contact the author:
+#Name author: Tom Slenter
+#E-mail: info@remotesyslog.com
+
+RSDESTP=/opt/RS/plugins
+SYSLOGCONF=/etc/syslog-ng/conf.d
+GEOCONF=/etc/GeoIP.conf
+APACHCONF=/var/www/html
+RSDEST=/opt/RS
+APACHPHP=/etc/php/7.[0-9]/apache2
+
+#Banner
+function banner() {
+    echo ""
+    echo "#################################################"
+    echo "#Remote Syslog addons (Tested / Untested)       #"
+    echo "#More information: remotesyslog.com             #"
+    echo "#Remote Syslog addons                           #"
+    echo "#Version: 0.1                                   #"
+    echo "#URL: https://github.com/tslenter/RSADDONS      #"
+    echo "#################################################"
+    echo ""
+    echo "The addons are experimental ..."
+    echo "Addons are untested and used for development ..."
+    echo "Use at your own risk ..."
+    echo ""
+}
+
+#Check if user is root
+if ! [ $(id -u) = 0 ]; then
+    clear
+    banner
+    echo "This installation must be run as root!"
+    echo ""
+    exit 1
+fi
+
+#Functions to check files, packages ...
+function check_package() {
+echo "Check package $1"
+dpkg-query -l $1 > /dev/null 2>&1
+if [ $? = 0 ]
+then
+    echo "Installation found ..."
+else
+    echo "Installation failed, abort (Hint: Did you install the core? ..."
+    exit
+fi
+}
+
+#Check if file exist
+function check_file() {
+    file=$1
+    if [ -e "$file" ]; then
+        echo "File: $1 exists, continue installation ..."
+    else
+        echo "File: $1 does not exist, exit ..."
+        exit
+    fi
+}
+
+#Check if database is corectly installed
+function geo_check() {
+    if [ -f /var/lib/GeoIP/GeoLite2-City.mmdb ]; then
+        echo "Check database for IP: 1.2.3.4 ..."
+        mmdblookup --file /var/lib/GeoIP/GeoLite2-City.mmdb --ip 1.2.3.4
+        echo "Check done ..."
+    else
+        echo "No database found ..."
+        exit
+    fi
+}
+
+#Function for geo data
+function geo() {
+    echo "Install geo data module ..."
+    sudo add-apt-repository ppa:maxmind/ppa -y
+    apt update
+    apt install geoipupdate mmdb-bin syslog-ng-mod-geoip2 -y
+    echo ""
+    echo ""
+    echo "Instuction:"
+    echo ""
+    echo "Go to https://dev.maxmind.com/geoip/geoipupdate/ and create a account ..."
+    echo "After that request a license and then continue ..."
+    echo ""
+    if [ -f $GEOCONF ]; then
+        read -p 'Account ID: ' accountid
+        read -p 'LicenseKey: ' licensekey
+        if test "$accountid" = ""; then
+            echo "Sorry, Account ID cannot be blank" >&2
+            exit 1;
+        fi
+        if test "$licensekey" = ""; then
+            echo "Sorry, License key cannot be blank" >&2
+            exit 1;
+        fi
+        echo "Update configuration ..."
+        sed -i "s|\AccountID.*|AccountID $accountid|" $GEOCONF
+        sed -i "s|\LicenseKey.*|LicenseKey $licensekey|" $GEOCONF
+        echo "Update database..."
+        geoipupdate
+        echo "Geo configuration updated with:"
+        cat $GEOCONF | grep AccountID
+        cat $GEOCONF | grep LicenseKey
+    else
+        echo "Configuration file not found ..."
+    fi
+}
+
+#Function for geo data update
+function geoupdate_rs() {
+    if [ -f /var/lib/GeoIP/GeoLite2-City.mmdb ]; then
+        echo "Update database... "
+        geoipupdate
+    else
+        echo "No database found ..."
+        exit
+    fi
+}
+
+#Function for view cisco ACL
+function ciscoconfig() {
+    echo "Displaying default configuration ACL Cisco ..."
+    echo ""
+    $RSDESTP/cisco/instruction
+    exit
+}
+
+#Function for view Checkpoint
+function checkpointconfig() {
+    echo "Displaying default Checkpoint configuration ..."
+    echo ""
+    $RSDESTP/checkpoint/instruction
+    exit
+}
+
+#Function for view rollover
+function rolloverconfig() {
+    echo "Displaying default rollover configuration ..."
+    echo ""
+    $RSDESTP/rollover/instruction
+    exit
+}
+
+#Function for view f5
+function f5config() {
+    echo "Displaying default F5 configuration ..."
+    echo ""
+    $RSDESTP/f5/instruction
+    exit
+}
+
+#Function for view msdhcp
+function msdhcpconfig() {
+    echo "Displaying default dhcp configuration ..."
+    echo ""
+    $RSDESTP/msdhcp/instruction
+    exit
+}
+
+#Function for view squid
+function squidconfig() {
+    echo "Displaying default Squid configuration ..."
+    echo ""
+    $RSDESTP/squid/instruction
+    exit
+}
+
+#Install ubiquiti parser
+function ubiquiti_parser() {
+    if [ -f /var/lib/GeoIP/GeoLite2-City.mmdb ]; then
+        echo "Print config ..."
+	cat $RSDESTP/ubiquiti/99RSX-uni-ubi.conf
+	echo ""
+	read -p "Do you want to update the default RSX configuration with this one? y/n " -n 1 -r
+	echo ""
+	if [[ $REPLY =~ ^[Yy]$ ]]
+	then
+	    echo "Overwrite of default RSX file ..."
+	    cp $RSDESTP/ubiquiti/99RSX-uni-ubi.conf $SYSLOGCONF/99RSX-rs.conf
+            echo "Update Elastic configuration ..."
+            curl -X PUT http://127.0.0.1:9200/_ilm/policy/rsx-default-geo -H 'Content-Type:application/json' -d '{
+               "policy": {
+                   "phases": {
+                   "hot": {
+                       "min_age": "0ms",
+                       "actions": {}
+                   },
+                   "delete": {
+                        "min_age": "10d",
+                        "actions": {
+                           "delete": {}
+                            }
+                        }
+                    }
+                }
+            }'
+            curl -X PUT http://127.0.0.1:9200/_template/rsx-syslog-ng -H 'Content-Type:application/json' -d '{
+                "template":"rsx-syslog-ng*",
+                "settings": {
+                "number_of_replicas": 1,
+                "number_of_shards": 1,
+                "index.lifecycle.name": "rsx-default-geo",
+                "index.lifecycle.rollover_alias": "rsx-syslog-ng"
+                },
+                "mappings": {
+                    "properties": {
+                        "geoip2": {
+                            "properties": {
+                                "src.geo_point": {
+                                "type": "geo_point"
+                                },
+                                "dst.geo_point": {
+                                "type": "geo_point"
+                                }
+                            }
+                        }
+                    }
+                }
+            }'
+            echo ""
+            echo "Restart services ..."
+            service syslog-ng restart
+            echo ""
+            cat $RSDESTP/ubiquiti/99RSX-uni-ubi.txt
+            echo ""
+            echo "Done ..."
+            exit
+	else
+	    echo "Exit ..."
+            exit
+	fi
+    else
+        echo "The configuration is not going to work, Geo location not found!"
+    fi
+}
+
+#LOGSTASH ADDON
+function logstash_install() {
+    echo "Started logstash installation ..."
+    chmod +x $RSDESTP/logstash/logstash_in
+    $RSDESTP/logstash/logstash_in
+    exit
+}
+
+function logstash_remove() {
+    echo "Started logstash installation ..."
+    chmod +x $RSDESTP/logstash/logstash_rm
+    $RSDESTP/logstash/logstash_rm
+    exit
+}
+
+function netflow() {
+    echo "Started netflow installation ..."
+    chmod +x $RSDESTP/netflow/netflow_in
+    $RSDESTP/netflow/netflow_in
+    exit
+}
+
+function cisco_filebeat() {
+    echo "Started Cisco filebeat installation ..."
+    chmod +x $RSDESTP/cisco_filebeat/cisco_filebeat_in
+    $RSDESTP/cisco_filebeat/cisco_filebeat_in
+    exit
+}
+
+function skedler() {
+    echo "Started Skedler installation ..."
+    chmod +x $RSDESTP/skedler/skedler_in
+    $RSDESTP/skedler/skedler_in
+    exit
+}
+
+function en_dis_proxy() {
+    echo "Started Skedler installation ..."
+    chmod +x $RSDESTP/dis_proxy/dis_proxy_in
+    $RSDESTP/dis_proxy/dis_proxy_in
+    exit
+}
+
+function plaintextconfig() {
+    echo "Display plaintext configuration for filebeat ..."
+    chmod +x $RSDESTP/plaintext/instruction
+    $RSDESTP/plaintext/instruction
+    exit
+}
+
+clear
+banner
+#Menu
+PS3='Please enter your choice: '
+options=("Install Geo2 location data" "Update Geo2 location database" "Check Geo2 database" "Install/view ubiquiti/unifi config with Geo2" "Display example configuration Cisco ACL" "Display example configuration CheckPoint" "Display example configuration F5" "Display example template Elasticsearch rollover" "Display example configuration Microsoft DHCP" "Display example configuration Squid" "Display example configuration plaintext files" "Install logstash" "Remove logstash" "Remove/Install netflow" "Remove/Install Cisco filebeat" "Remove/Install Skedler" "Disable/Enable proxy" "Quit")
+select opt in "${options[@]}"
+do
+    case $opt in
+        "Install Geo2 location data")
+            clear
+            banner
+            geo
+            exit
+    ;;
+        "Update Geo2 location database")
+            clear
+            banner
+            geoupdate_rs
+            exit
+    ;;
+        "Check Geo2 database")
+            clear
+            banner
+            geo_check
+            exit
+    ;;
+        "Install/view ubiquiti/unifi config with Geo2")
+            clear
+            banner
+            ubiquiti_parser
+            exit
+    ;;
+        "Display example configuration Cisco ACL")
+            clear
+            banner
+            ciscoconfig
+            exit
+    ;;
+        "Display example configuration CheckPoint")
+            clear
+            banner
+            checkpointconfig
+            exit
+    ;;
+        "Display example configuration F5")
+            clear
+            banner
+            f5config
+            exit
+    ;;
+        "Display example template Elasticsearch rollover")
+            clear
+            banner
+            rolloverconfig
+            exit
+    ;;
+        "Display example configuration Microsoft DHCP")
+            clear
+            banner
+            msdhcpconfig
+            exit
+    ;;
+        "Display example configuration Squid")
+            clear
+            banner
+            squidconfig
+            exit
+    ;;
+        "Display example configuration plaintext files")
+            clear
+            banner
+            plaintextconfig
+            exit
+    ;;
+        "Install logstash")
+            clear
+            banner
+            logstash_install
+            exit
+    ;;
+        "Remove logstash")
+            clear
+            banner
+            logstash_remove
+            exit
+    ;;
+        "Remove/Install netflow")
+            clear
+            banner
+            netflow
+            exit
+   ;;
+        "Remove/Install Cisco filebeat")
+            clear
+            banner
+            cisco_filebeat
+            exit
+   ;;
+        "Remove/Install Skedler")
+            clear
+            banner
+            skedler
+            exit
+   ;;
+        "Disable/Enable proxy")
+            clear
+            banner
+            en_dis_proxy
+            exit
+   ;;
+        "Quit")
+            break
+   ;;
+        *) echo "Invalid option $REPLY ..." ;;
+    esac
+done
