@@ -26,6 +26,7 @@ GEOCONF=/etc/GeoIP.conf
 APACHCONF=/var/www/html
 RSDEST=/opt/RSADDONS
 APACHPHP=/etc/php/7.[0-9]/apache2
+RSPATH=$(pwd)
 
 #Banner
 function banner() {
@@ -303,6 +304,25 @@ function plaintextconfig() {
     $RSDESTP/plaintext/instruction
     exit
 }
+
+clear
+banner
+echo "Setting up environment ..."
+echo "Check 1 ..."
+if [ -e $RSPATH/rsaddon ]; then
+    echo "rsinstaller found in local directory, copy to $RSDEST started ..."
+    if [ -d $RSDEST ]; then
+        echo "Directory already exist ..."
+    else
+        mkdir $RSDEST
+        echo "Directory created ..."
+    fi
+    cp -rf $RSPATH/* $RSDEST
+elif [ -e $RSDEST/rsaddon ]; then
+    echo "rsinstaller run from $RSDEST, going for $RSDEST environment ..."
+else
+    echo "Did you run the installer from the right directory? ..."
+fi
 
 clear
 banner
