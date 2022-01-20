@@ -37,6 +37,7 @@ function banner() {
     echo "#Remote Syslog addons                           #"
     echo "#Version: 0.1                                   #"
     echo "#URL: https://github.com/tslenter/RSADDONS      #"
+    echo "#Donation: https://github.com/tslenter/RS       #"
     echo "#################################################"
     echo ""
     echo "The addons are experimental ..."
